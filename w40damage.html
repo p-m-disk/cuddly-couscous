@@ -1,0 +1,254 @@
+<html>
+	<head>
+		<title>Damage estimation</title>
+	</head>
+	<body>
+
+		<!-- TODO
+			- damage from dice
+			- sustained hits
+			- devastating wounds
+			- hit modifier
+			- wound modifier
+			- save modifier?
+			- make prettier
+		-->
+		<h3>
+			Attacker
+		</h3>
+		<div>
+			<label for="attacks">Attacks</label>
+			<input id="attacks" type="number" url-param="a" default-value="1" onchange="recalculate()" min="0"/>
+
+			<label for="attacks_d6">D6</label>
+			<input id="attacks_d6" type="number" url-param="ad6" default-value="0" onchange="recalculate()" min="0"/>
+
+			<label for="attacks_d3">D3</label>
+			<input id="attacks_d3" type="number" url-param="ad3" default-value="0" onchange="recalculate()" min="0"/>
+		</div>
+		<div>
+			<label for="skill">Skill (N+)</label>
+			<input id="skill" 
+				type="number" min="1" max="6"
+				url-param="ws" default-value="4" 
+				onchange="recalculate()"/>
+		</div>
+		<!-- hit modifier? -->
+		<div>
+			<label for="hit_reroll">Hit reroll</label>
+			<select id="hit_reroll" url-param="h_reroll" default-value="" onchange="recalculate()">
+				<option value="">None</option>
+				<option value="1">1</option>
+				<option value="all">All</option>
+			</select>
+		</div>
+		<div>
+			<label for="strength">Strength</label>
+			<input id="strength"
+				type="number" min="1"
+				url-param="s" default-value="1" onchange="recalculate()"/>
+		</div>
+		<div>
+			<label for="wound_reroll">Wound reroll</label>
+			<select id="wound_reroll" url-param="w_reroll" default-value="" onchange="recalculate()">
+				<option value="">None</option>
+				<option value="1">1</option>
+				<option value="all">All</option>
+			</select>
+		</div>
+		<div>
+			<label for="ap">AP</label>
+			<input id="ap" 
+				type="number" min="0"
+				url-param="ap" default-value="0" onchange="recalculate()"/>
+		</div>		
+		<div>
+			<label for="damage">Damage</label>
+			<input id="damage" type="number" url-param="dam" default-value="1" onchange="recalculate()"/>
+		</div>
+		<!-- add D3/D6 for damage? radio buttons? -->
+		<h3>
+			Target
+		</h3>
+		<div>
+			<label for="toughness">Toughness</label>
+			<input id="toughness" type="number" url-param="t" default-value="3" onchange="recalculate()"/>
+		</div>
+		<div>
+			<label for="save">Save (N+)</label>
+			<input id="save" type="number" url-param="sv" default-value="3" onchange="recalculate()"/>
+		</div>
+		<div>
+			<label for="invuln_save">Invulnerable save (N+)</label>
+			<input id="invuln_save" type="number" url-param="invuln_sv" default-value="7" onchange="recalculate()"/>
+		</div>
+
+		<!-- save reroll ? -->
+
+		<h3>
+			Additional
+		</h3> 
+		<div>
+			<label for="anti">Anti (N+)</label>
+			<input id="anti" type="number" url-param="anti" default-value="7" onchange="recalculate()"/>
+		</div>
+		<!-- Anti n -->
+		<!-- sustained hits ? -->
+		<!-- sustained hits  -->
+
+		<h3>
+			Expected wounds: <span id="result"></span> 
+		</h3> 
+		
+
+		<script type="application/javascript">
+			readUrlParams();
+
+			recalculate();
+
+			function recalculate() {
+				try
+				{
+					setUrlParams();
+
+					const attacks = getIntInputValue('attacks');
+					const attacksD6 = getIntInputValue('attacks_d6');
+					const attacksD3 = getIntInputValue('attacks_d3');
+					const skill = getIntInputValue('skill');
+					const hitReroll = getSelectValue('hit_reroll');
+					const strength = getIntInputValue('strength');
+					const woundReroll = getSelectValue('wound_reroll');
+					const armourPiercing = getIntInputValue('ap');
+					const dam = getIntInputValue('damage');
+					const toughness = getIntInputValue('toughness');
+					const save = getIntInputValue('save');
+					const invulnSave = getIntInputValue('invuln_save');
+					const anti = getIntInputValue('anti');
+
+					const hitProbability = getProbability(skill, hitReroll);
+
+					let toWound = getToWoundValue(strength, toughness);
+					toWound = toWound > anti ? anti : toWound;
+					const woundProbability = getProbability(toWound, woundReroll);
+
+					const modifiedSave = save + armourPiercing;
+					const effectiveSave = modifiedSave < invulnSave ? modifiedSave : invulnSave;
+					const saveProbability = 1 - getProbability(effectiveSave);
+
+					const totalAttacks = attacks + attacksD6 * 3.5 + attacksD3 * 2;
+					const result = totalAttacks * hitProbability * woundProbability * saveProbability;
+					document.getElementById('result').innerHTML = round(result, 4);
+				} 
+				catch (err) {
+					console.error(err);
+				}
+			}
+
+			/**
+			 * @param input {HTMLInputElement} 
+			 * @param params {URLSearchParams}
+			 * */
+			function setIntInput(input, params) {
+				const paramName = getParamNameAttribute(input);
+				const paramValue = paramName && params.get(paramName) || getDefaultValue(input);
+				input.value = parseInt(paramValue);
+			}
+			
+			/**
+			 * @param select {HTMLSelectElement} 
+			 * @param params {URLSearchParams}
+			 * */
+			function setSelect(select, params) {
+				const paramName = getParamNameAttribute(select);
+				const paramValue = paramName && params.get(paramName) || getDefaultValue(select);
+				select.value = paramValue;
+			}
+
+			/**
+			 * @param element {HTMLElement} 
+			 * */
+			function getParamNameAttribute(element) {
+				return element.getAttribute('url-param');
+			}
+
+			/**
+			 * @param element {HTMLElement} 
+			 * */
+			 function getDefaultValue(element) {
+				return element.getAttribute('default-value');
+			}
+
+			function getIntInputValue(id) {
+				const input = document.getElementById(id);
+				return parseInt(input && input.value);
+			}
+
+			function getSelectValue(id) {
+				const input = document.getElementById(id);
+				return input && input.value;
+			}
+
+			function round(n, d = digits) {
+				const factor = Math.pow(10, d);
+				return Math.round(n * factor) / factor;
+			}
+
+			function getProbability(toHit, rerollType) {
+				const baseProbability = (7 - toHit) / 6;
+				if (baseProbability <= 0) {
+					return 0;
+				}
+
+				switch (rerollType) {
+					case '1': 
+						// base + chance of rolling 1 * base
+						return baseProbability + 1 / 6 * baseProbability;
+					case 'all': 
+						// base + chance of failure * base
+						return baseProbability + (1 - baseProbability) * baseProbability;
+				}
+
+				return baseProbability;
+			}
+
+			function getToWoundValue(strength, toughness) {
+				const ratio = toughness / strength;
+
+				if (ratio >= 2) {
+					return 6;
+				} else if (ratio > 1) {
+					return 5;
+				} else if (ratio == 1) {
+					return 4;
+				} else if (ratio > 0.5) {
+					return 3;
+				}
+
+				return 2;
+			}
+
+			function readUrlParams() {
+				const params = new URLSearchParams(window.location.search);
+				document.querySelectorAll('input[type=number]').forEach(input => setIntInput(input, params));
+				document.querySelectorAll('select').forEach(input => setSelect(input, params));
+			}
+
+			function setUrlParams() {
+				const params = new URLSearchParams(window.location.search);
+				document.querySelectorAll('input[type=number], select').forEach(input => {
+					const paramName = getParamNameAttribute(input)
+					if (paramName) {
+						if (input.value !== getDefaultValue(input)){
+							params.set(paramName, input.value);
+						} else {
+							params.delete(paramName);
+						}
+					}
+				});
+
+				const path = location.href.split('?')[0] + '?' + params.toString();
+				window.history.pushState(path, document.title, path);
+			}
+		</script>
+	</body>
+</html>
